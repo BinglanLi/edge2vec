@@ -1,1 +1,10 @@
 .DS_Store
+# IDE
+.idea/
+__pycache__/
+.venv/
+
+# Test files
+*.csv
+*.tsv
+hetionet-v1.0-edges.sif.gz
