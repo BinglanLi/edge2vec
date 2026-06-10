@@ -97,13 +97,13 @@ def initialize_edge_type_matrix(type_num):
 
 def simulate_walks(G, num_walks, walk_length,matrix,is_directed,p,q):
     '''
-    generate random walk paths constrainted by transition matrix
+    generate random walk paths constrained by transition matrix
     '''
     walks = []
     links = list(G.edges(data = True))
-    print 'Walk iteration:'
+    print('Walk iteration:')
     for walk_iter in range(num_walks):
-        print str(walk_iter+1), '/', str(num_walks)
+        print(f'{str(walk_iter + 1)} / {str(num_walks)}')
         random.shuffle(links)
         count = 1000
         for link in links:
@@ -190,35 +190,34 @@ def edge2vec_walk(G, walk_length, start_link,matrix,is_directed,p,q):
         # random.shuffle(neighbors)
         rand = np.random.rand() * distance_sum
         threshold = 0
-        # next_link_end_node = 0 
-        neighbors2 = G.neighbors(direction_node) 
+        next_link_end_node = None
+        neighbors2 = G.neighbors(direction_node)
         for neighbor in neighbors2:
-            # print "current threshold: ", threshold
             neighbor_link = G[direction_node][neighbor]#get candidate link's type
             neighbor_link_type = neighbor_link['type']
             neighbor_link_weight = neighbor_link['weight']
             trans_weight = matrix[cur_edge_type-1][neighbor_link_type-1]
-            if G.has_edge(neighbor,left_node) or G.has_edge(left_node,neighbor): 
+            if G.has_edge(neighbor,left_node) or G.has_edge(left_node,neighbor):
                 threshold += trans_weight*neighbor_link_weight/p
                 if threshold >= rand:
                     next_link_end_node = neighbor
-                    break;
+                    break
             elif neighbor == left_node:
                 threshold += trans_weight*neighbor_link_weight
                 if threshold >= rand:
                     next_link_end_node = neighbor
-                    break;
+                    break
             else:
                 threshold += trans_weight*neighbor_link_weight/q
                 if threshold >= rand:
                     next_link_end_node = neighbor
-                    break;
+                    break
 
         # print "distance_sum: ",distance_sum
         # print "rand: ", rand, " threshold: ", threshold
         # print "next_link_end_node: ",next_link_end_node
 
-        if distance_sum > 0: # the direction_node has next_link_end_node
+        if distance_sum > 0 and next_link_end_node is not None:
             next_link = G[direction_node][next_link_end_node]
             # next_link = G.get_edge_data(direction_node,next_link_end_node)
             
@@ -248,25 +247,28 @@ def update_trans_matrix(walks,type_size,evaluation_metric):
         repo[i] = []
 
     for walk in walks:
-        curr_repo = dict()#store each type number in current walk
+        curr_repo = dict()  #store each type number in current walk
+        print(f'walk = {walk}')
         for edge in walk:
             edge_id = int(edge) - 1 
             if edge_id in curr_repo:
                 curr_repo[edge_id] = curr_repo[edge_id]+1
             else:
                 curr_repo[edge_id] = 1
+        # print(f'curr_repo = {curr_repo}')
 
         for i in range(type_size):
-            
             # print "curr_repo[i]: ",curr_repo[i],type(curr_repo[i])
             if i in curr_repo:
-                repo[i].append(curr_repo[i]) 
+                repo[i].append(curr_repo[i])
+                # print(f'curr_repo[i]  = {curr_repo[i]}')
+                # print(f'repo[i] = {repo[i]}')
             else:
-                repo[i].append(0) 
-    
+                repo[i].append(0)
+
     for i in range(type_size):
         # print "repo ",i, ": ",repo[i],type(repo[i])
-        for j in range(type_size):  
+        for j in range(type_size):
             if evaluation_metric == 1:
                 sim_score = wilcoxon_test(repo[i],repo[j])  
                 matrix[i][j] = sim_score
@@ -289,31 +291,32 @@ def update_trans_matrix(walks,type_size,evaluation_metric):
 different ways to calculate correlation between edge-types
 '''
 #pairwised judgement
-def wilcoxon_test(v1,v2):# original metric: the smaller the more similar 
-    result = stats.wilcoxon(v1, v2).statistic
-    if result != result:
+def wilcoxon_test(v1, v2):  # original metric: the smaller the more similar
+    try:
+        result = stats.wilcoxon(v1, v2).statistic
+    except ValueError:  # raised by modern scipy when all differences are zero
         result = 0
-    return 1/(math.sqrt(result)+1)
+    return 1 / (math.sqrt(result) + 1)
 
-def entroy_test(v1,v2):#original metric: the smaller the more similar
-    result = stats.entropy(v1,v2)
-    result = stats.wilcoxon(v1, v2).statistic
-    if result != result:
+def entroy_test(v1, v2):  # original metric: the smaller the more similar
+    result = stats.entropy(v1, v2)
+    # intentional: overwrites entropy with wilcoxon statistic (preserved from original)
+    try:
+        result = stats.wilcoxon(v1, v2).statistic
+    except ValueError:
         result = 0
     return result
 
-def spearmanr_test(v1,v2):#original metric: the larger the more similar 
-    result = stats.mstats.spearmanr(v1,v2).correlation
-    result = stats.wilcoxon(v1, v2).statistic
-    if result != result:
-        result = -1
+def spearmanr_test(v1, v2):  # original metric: the larger the more similar
+    result = stats.mstats.spearmanr(v1, v2).correlation
+    if result != result:  # NaN for constant vectors (e.g., all-zero); treat as perfect correlation
+        result = 1.0
     return sigmoid(result)
 
-def pearsonr_test(v1,v2):#original metric: the larger the more similar
-    result = stats.mstats.pearsonr(v1,v2)[0]
-    result = stats.wilcoxon(v1, v2).statistic
-    if result != result:
-        result = -1
+def pearsonr_test(v1, v2):  # original metric: the larger the more similar
+    result = stats.mstats.pearsonr(v1, v2)[0]
+    if result != result:  # NaN for constant vectors; treat as perfect correlation
+        result = 1.0
     return sigmoid(result)
 
 def cos_test(v1,v2): 
@@ -331,10 +334,10 @@ def relu(x):
 def main(args): 
     # print "------begin to write graph---------"
     # generate_graph_write_edgelist(args.m1,args.m2,args.input)
-    print "begin to initialize transition matrix"
+    print("begin to initialize transition matrix")
     trans_matrix = initialize_edge_type_matrix(args.type_size)
-    print trans_matrix
-    print "------begin to read graph---------" 
+    # print('{trans_matrix}')
+    print("------begin to read graph---------")
     G = read_graph(args.input,args.weighted,args.directed)
     # print G.edges(data=True)
     # nodes = list(G.nodes)
@@ -342,14 +345,15 @@ def main(args):
 
     # # G=nx.barbell_graph(17,1)
     # # draw_graph(G) 
-    print "------begin to simulate walk---------"
+    print("------begin to simulate walk---------")
     for i in range(args.em_iteration):
         walks = simulate_walks(G,args.num_walks, args.walk_length,trans_matrix,args.directed,args.p,args.q)#M step
-        print str(i), "th iteration for Upating transition matrix!"
+        print(f'total number of walks: {len(walks)}')
+        print(f'{str(i)}, "th iteration for Updating transition matrix!"')
         trans_matrix = update_trans_matrix(walks,args.type_size,args.e_step)#E step
-        print "trans_matrix: ",trans_matrix
+        # print(f"trans_matrix: {trans_matrix}")
     # print walks 
-    print "------finish!---------"
+    print("------finish!---------")
     np.savetxt(args.output, trans_matrix)
 if __name__ == "__main__":
     args = parse_args()

@@ -89,16 +89,16 @@ def read_edge_type_matrix(file):
 
 def simulate_walks(G, num_walks, walk_length,matrix,is_directed,p,q):
     '''
-    generate random walk paths constrainted by transition matrix
+    generate random walk paths constrained by transition matrix
     '''
     walks = []
     nodes = list(G.nodes())
-    print 'Walk iteration:'
+    print('Walk iteration:')
     for walk_iter in range(num_walks):
-        print str(walk_iter+1), '/', str(num_walks)
+        print(f'{str(walk_iter + 1)} / {str(num_walks)}')
         random.shuffle(nodes) 
         for node in nodes:
-            # print "chosen node id: ",nodes
+            # print(f'chosen node id: {nodes}')
             walks.append(edge2vec_walk(G, walk_length, node,matrix,is_directed,p,q))  
     return walks
 
@@ -110,7 +110,7 @@ def edge2vec_walk(G, walk_length, start_node,matrix,is_directed,p,q):
     walk = [start_node]  
     while len(walk) < walk_length:# here we may need to consider some dead end issues
         cur = walk[-1]
-        cur_nbrs =sorted(G.neighbors(cur)) #(G.neighbors(cur))
+        cur_nbrs = sorted(G.neighbors(cur)) #(G.neighbors(cur))
         random.shuffle(cur_nbrs)
         if len(cur_nbrs) > 0:
             if len(walk) == 1:
@@ -122,21 +122,20 @@ def edge2vec_walk(G, walk_length, start_node,matrix,is_directed,p,q):
                 pre_edge_type = G[prev][cur]['type']
                 distance_sum = 0
                 for neighbor in cur_nbrs:
-                    neighbor_link = G[cur][neighbor] 
+                    neighbor_link = G[cur][neighbor]
                     # print "neighbor_link: ",neighbor_link
                     neighbor_link_type = neighbor_link['type']
                     # print "neighbor_link_type: ",neighbor_link_type
                     neighbor_link_weight = neighbor_link['weight']
                     trans_weight = matrix[pre_edge_type-1][neighbor_link_type-1]
-                    
+
                     if G.has_edge(neighbor,prev) or G.has_edge(prev,neighbor):#undirected graph
-                        
+
                         distance_sum += trans_weight*neighbor_link_weight/p #+1 normalization
                     elif neighbor == prev: #decide whether it can random walk back
                         distance_sum += trans_weight*neighbor_link_weight
                     else:
                         distance_sum += trans_weight*neighbor_link_weight/q
-
                 '''
                 pick up the next step link
                 ''' 
@@ -151,23 +150,21 @@ def edge2vec_walk(G, walk_length, start_node,matrix,is_directed,p,q):
                     neighbor_link_weight = neighbor_link['weight']
                     trans_weight = matrix[pre_edge_type-1][neighbor_link_type-1]
                     
-                    if G.has_edge(neighbor,prev)or G.has_edge(prev,neighbor):#undirected graph
-                        
+                    if G.has_edge(neighbor,prev) or G.has_edge(prev,neighbor):#undirected graph
                         threshold += trans_weight*neighbor_link_weight/p 
                         if threshold >= rand:
                             next = neighbor
-                            break;
+                            break
                     elif neighbor == prev:
                         threshold += trans_weight*neighbor_link_weight
                         if threshold >= rand:
-                            next_link_end_node = neighbor
-                            break;        
+                            next = neighbor
+                            break
                     else:
                         threshold += trans_weight*neighbor_link_weight/q
                         if threshold >= rand:
                             next = neighbor
-                            break;
-
+                            break
                 walk.append(next) 
         else:
             break #if only has 1 neighbour 
@@ -178,17 +175,27 @@ def edge2vec_walk(G, walk_length, start_node,matrix,is_directed,p,q):
  
 
 def main(args):  
-    print "begin to read transition matrix"
+    print("begin to read transition matrix")
     trans_matrix = read_edge_type_matrix(args.matrix)
-    print trans_matrix
+    # print(trans_matrix)
 
-    print "------begin to read graph---------"
+    print("------begin to read graph---------")
     G = read_graph(args.input,args.weighted,args.directed) 
+    # print(f'Read graph:\n{G}')
 
-    print "------begin to simulate walk---------" 
+    print("------begin to simulate walk---------" )
     walks = simulate_walks(G,args.num_walks, args.walk_length,trans_matrix,args.directed,args.p,args.q) 
-    # print walks  
-    model = Word2Vec(walks, size=args.dimensions, window=args.window_size, min_count=0, sg=1, workers=args.workers, iter=args.iter)
+    # print walks
+    # print("------example of the first walk---------")
+    # print(walks)
+    model = Word2Vec(walks,
+                     vector_size=args.dimensions,
+                     window=args.window_size,
+                     min_count=0,
+                     sg=1,
+                     negative=1,
+                     workers=args.workers,
+                     epochs=args.iter)
     model.wv.save_word2vec_format(args.output)
 if __name__ == "__main__":
     args = parse_args()
